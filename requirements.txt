@@ -1,0 +1,4 @@
+flask>=2.3.0
+gunicorn>=21.2.0
+sqlalchemy
+psycopg2-binary

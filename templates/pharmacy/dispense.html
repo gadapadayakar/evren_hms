@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% block title %}Dispense Medicines{% endblock %}
+{% block extra_css %}
+<style>
+.med-row{display:grid;grid-template-columns:2.5fr 1fr 90px 110px 36px;gap:.5rem;align-items:end;padding:.7rem;border:1px solid var(--border);border-radius:8px;margin-bottom:.5rem;background:#fafafa;}
+.med-row:hover{background:#f0f4ff;}
+.note-row{grid-column:1/-1;margin-top:-.2rem;}
+#bill-total{font-size:1.8rem;font-weight:800;color:var(--success);}
+.remove-btn{background:none;border:none;color:var(--danger);font-size:1.2rem;cursor:pointer;padding:.2rem .3rem;line-height:1;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>💉 Dispense Medicines</h1><div class="breadcrumb">Pharmacy → Dispense to Patient</div></div>
+  <div class="flex gap-2">
+    <a href="{{ url_for('pharmacy_walkin') }}" class="btn" style="background:#7c3aed;color:#fff;">🛍️ Walk-in Sale</a>
+    <a href="{{ url_for('pharmacy_dispense_all') }}" class="btn btn-secondary">📋 Dispense Log</a>
+    <a href="{{ url_for('pharmacy_list') }}" class="btn btn-secondary">← Stock</a>
+  </div>
+</div>
+
+<form method="POST" id="dispenseForm">
+<div style="display:grid;grid-template-columns:380px 1fr;gap:1.5rem;align-items:start;">
+
+  <div>
+    <!-- Patient Card -->
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">👤 Patient Details</h3></div>
+      <div class="card-body">
+        <div class="form-group" style="position:relative;">
+          <label class="form-label">Patient Name <span style="color:red">*</span></label>
+          <input type="text" id="patientSearch" class="form-control" placeholder="Type to search patient..." autocomplete="off" oninput="searchPatient(this.value)">
+          <input type="hidden" name="patient_id" id="patientId" value="0">
+          <div id="patientDropdown" style="display:none;position:absolute;z-index:1000;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:220px;overflow-y:auto;width:100%;top:100%;left:0;margin-top:2px;"></div>
+        </div>
+        <div id="patientInfo" style="display:none;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:.6rem .875rem;font-size:.82rem;margin-top:.4rem;">
+          <strong id="pName" style="font-size:.95rem;"></strong>
+          <span style="margin-left:.75rem;color:var(--muted);">ID: <span id="pId"></span></span>
+          <span style="margin-left:.75rem;color:var(--muted);">Blood: <span id="pBg"></span></span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:.75rem;">
+          <div class="form-group"><label class="form-label">Date</label><input type="date" name="dispense_date" class="form-control" value="{{ today }}"></div>
+          <div class="form-group"><label class="form-label">Payment</label>
+            <select name="payment_status" class="form-control"><option value="paid">Paid</option><option value="unpaid">Unpaid/Credit</option></select></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+          <div class="form-group"><label class="form-label">OPD Ref <small>(opt)</small></label><input type="number" name="opd_id" class="form-control" value="0"></div>
+          <div class="form-group"><label class="form-label">IPD Ref <small>(opt)</small></label><input type="number" name="ipd_id" class="form-control" value="0"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bill Summary -->
+    <div class="card" style="margin-top:1rem;">
+      <div class="card-header"><h3 class="card-title">🧾 Bill Summary</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table style="width:100%;font-size:.82rem;border-collapse:collapse;">
+          <thead><tr style="background:#f8fafc;">
+            <th style="padding:.5rem .75rem;text-align:left;">Medicine</th>
+            <th style="padding:.5rem .75rem;text-align:center;">Qty</th>
+            <th style="padding:.5rem .75rem;text-align:right;">Rate</th>
+            <th style="padding:.5rem .75rem;text-align:right;">Amount</th>
+          </tr></thead>
+          <tbody id="billBody"><tr><td colspan="4" style="padding:1rem;text-align:center;color:var(--muted);">Add medicines →</td></tr></tbody>
+        </table>
+        <div style="text-align:right;padding:.875rem;border-top:2px solid var(--border);">
+          <div style="font-size:.78rem;color:var(--muted);">Total Bill</div>
+          <div id="bill-total">₹0.00</div>
+        </div>
+      </div>
+      <div style="padding:.875rem;border-top:1px solid var(--border);">
+        <button type="submit" class="btn btn-success" style="width:100%;font-size:1rem;padding:.65rem;">✅ Dispense & Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Medicine rows -->
+  <div class="card">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <h3 class="card-title">💊 Add Medicines</h3>
+      <button type="button" class="btn btn-primary btn-sm" onclick="addRow()">+ Add Row</button>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:2.5fr 1fr 90px 110px 36px;gap:.5rem;padding:.3rem .6rem;font-size:.72rem;font-weight:700;color:var(--muted);border-bottom:1px solid var(--border);margin-bottom:.4rem;">
+        <span>Medicine</span><span>Batch</span><span>Qty</span><span>Amount</span><span></span>
+      </div>
+      <div id="medRows"></div>
+      <div id="emptyMsg" style="text-align:center;padding:2rem;color:var(--muted);">Click <strong>"+ Add Row"</strong> to add a medicine</div>
+    </div>
+  </div>
+
+</div>
+</form>
+
+<script>
+const medicines = {{ medicines|tojson }};
+const medMap = {};
+medicines.forEach(m => { medMap[m.id] = m; });
+
+// Patient search
+const patientData = {{ patients|tojson }};
+function searchPatient(q) {
+  const dd = document.getElementById('patientDropdown');
+  if (!q || q.length < 1) { dd.style.display='none'; return; }
+  const matches = patientData.filter(p =>
+    p.patient_name.toLowerCase().includes(q.toLowerCase()) ||
+    (p.patient_unique_id||'').toLowerCase().includes(q.toLowerCase())
+  );
+  if (!matches.length) {
+    dd.innerHTML = '<div style="padding:.75rem;color:var(--muted);text-align:center;">No patients found</div>';
+    dd.style.display = 'block'; return;
+  }
+  dd.innerHTML = matches.slice(0,10).map(p => {
+    const name = (p.patient_name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const uid  = (p.patient_unique_id||'');
+    const bg   = (p.blood_group||'');
+    return `<div onclick="selectPatient(${p.id},'${name}','${uid}','${bg}')"
+       style="padding:.6rem 1rem;cursor:pointer;border-bottom:1px solid #f3f4f6;font-size:.88rem;"
+       onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background=''">
+      <strong>${p.patient_name}</strong>
+      <span style="color:#6b7280;margin-left:.5rem;font-size:.78rem;">${uid}</span>
+    </div>`;
+  }).join('');
+  dd.style.display = 'block';
+}
+function selectPatient(id, name, uid, bg) {
+  document.getElementById('patientSearch').value = name;
+  document.getElementById('patientId').value = id;
+  document.getElementById('patientDropdown').style.display = 'none';
+  document.getElementById('patientInfo').style.display = 'block';
+  document.getElementById('pName').textContent = name;
+  document.getElementById('pId').textContent = uid;
+  document.getElementById('pBg').textContent = bg || '—';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#patientSearch') && !e.target.closest('#patientDropdown'))
+    document.getElementById('patientDropdown').style.display = 'none';
+});
+
+// Medicine rows
+let rowCount = 0;
+function addRow() {
+  rowCount++;
+  const rid = rowCount;
+  document.getElementById('emptyMsg').style.display = 'none';
+  const div = document.createElement('div');
+  div.className = 'med-row';
+  div.id = 'row' + rid;
+  const opts = medicines.map(m =>
+    `<option value="${m.id}" data-price="${m.sale_price||0}" data-stock="${m.total_qty||0}">${m.medicine_name} (Stock:${m.total_qty||0})</option>`
+  ).join('');
+  div.innerHTML = `
+    <div><select name="medicine_id" class="form-control" onchange="medSelected(this,${rid})" required>
+      <option value="">— Select medicine —</option>${opts}
+    </select></div>
+    <div><select name="batch_id" class="form-control" id="batch${rid}"><option value="">Auto</option></select></div>
+    <div><input type="number" name="quantity" class="form-control" value="1" min="1" id="qty${rid}" oninput="calcRow(${rid})" required></div>
+    <div><input type="text" class="form-control" id="amt${rid}" readonly style="background:#f8fafc;font-weight:700;color:var(--success);" value="₹0.00"></div>
+    <div><button type="button" class="remove-btn" onclick="removeRow(${rid})">✕</button></div>
+    <div class="note-row"><input type="text" name="item_note" class="form-control" placeholder="Dosage note (optional)" style="font-size:.8rem;"></div>`;
+  document.getElementById('medRows').appendChild(div);
+}
+
+function medSelected(sel, rid) {
+  const mid = parseInt(sel.value);
+  if (!mid) return;
+  const m = medMap[mid];
+  if (!m) return;
+  calcRow(rid);
+  // Load batches - handle both array and {batches:[...]} response
+  fetch('/pharmacy/' + mid + '/batches')
+    .then(r => r.json())
+    .then(data => {
+      const list = Array.isArray(data) ? data : (data.batches || []);
+      const bs = document.getElementById('batch'+rid);
+      bs.innerHTML = '<option value="">Auto</option>';
+      list.forEach(b => {
+        const o = document.createElement('option');
+        o.value = b.id;
+        o.textContent = `${b.batch_no||'—'} | Exp:${b.expiry_date||'—'} | Qty:${b.available_quantity}`;
+        bs.appendChild(o);
+      });
+    }).catch(() => {});
+}
+
+function calcRow(rid) {
+  const sel = document.querySelector('#row'+rid+' select[name=medicine_id]');
+  if (!sel || !sel.value) return;
+  const m   = medMap[parseInt(sel.value)];
+  if (!m) return;
+  const qty = parseInt(document.getElementById('qty'+rid).value) || 0;
+  const rate = parseFloat(m.sale_price) || 0;
+  document.getElementById('amt'+rid).value = '₹' + (rate * qty).toFixed(2);
+  updateBill();
+}
+
+function removeRow(rid) {
+  const r = document.getElementById('row'+rid);
+  if (r) r.remove();
+  if (!document.querySelectorAll('.med-row').length)
+    document.getElementById('emptyMsg').style.display = 'block';
+  updateBill();
+}
+
+function updateBill() {
+  let total = 0;
+  const rows = [];
+  document.querySelectorAll('.med-row').forEach(row => {
+    const sel = row.querySelector('select[name=medicine_id]');
+    const qty = parseInt(row.querySelector('input[name=quantity]')?.value) || 0;
+    const amtEl = row.querySelector('[id^=amt]');
+    if (sel && sel.value && amtEl) {
+      const amt = parseFloat((amtEl.value||'0').replace('₹','')) || 0;
+      total += amt;
+      rows.push({ name: sel.selectedOptions[0]?.text||'', qty, rate: qty ? amt/qty : 0, amt });
+    }
+  });
+  document.getElementById('bill-total').textContent = '₹' + total.toFixed(2);
+  const tbody = document.getElementById('billBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="padding:1rem;text-align:center;color:var(--muted);">Add medicines →</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r =>
+    `<tr style="border-bottom:1px solid #f3f4f6;">
+       <td style="padding:.4rem .75rem;">${r.name.split('(')[0].trim()}</td>
+       <td style="padding:.4rem .75rem;text-align:center;">${r.qty}</td>
+       <td style="padding:.4rem .75rem;text-align:right;">₹${r.rate.toFixed(2)}</td>
+       <td style="padding:.4rem .75rem;text-align:right;font-weight:700;">₹${r.amt.toFixed(2)}</td>
+     </tr>`
+  ).join('');
+}
+
+addRow();
+</script>
+{% endblock %}

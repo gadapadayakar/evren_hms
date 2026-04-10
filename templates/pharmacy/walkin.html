@@ -1,0 +1,231 @@
+{% extends 'base.html' %}
+{% block title %}Walk-in Sale{% endblock %}
+{% block extra_css %}
+<style>
+.wrow-wrap { border:1px solid var(--border); border-radius:10px; margin-bottom:.75rem; background:#fafafa; overflow:hidden; }
+.wrow-wrap:hover { background:#f5f3ff; border-color:#a78bfa; }
+.wrow-main { display:grid; grid-template-columns:2.5fr 80px 100px 110px 40px; gap:.5rem; align-items:end; padding:.75rem .75rem .4rem; }
+.wrow-note { padding:0 .75rem .65rem; }
+.wrow-note input { font-size:.82rem; color:#4b5563; }
+.remove-btn { background:none; border:none; color:var(--danger); font-size:1.2rem; cursor:pointer; padding:.2rem; }
+#grandTotal { font-size:2rem; font-weight:800; color:var(--success); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>🛍️ Walk-in Medicine Sale</h1><div class="breadcrumb">Pharmacy → Walk-in Sale</div></div>
+  <div class="flex gap-2">
+    <a href="{{ url_for('pharmacy_dispense') }}" class="btn btn-secondary">💉 Dispense to Patient</a>
+    <a href="{{ url_for('pharmacy_list') }}" class="btn btn-secondary">← Pharmacy</a>
+  </div>
+</div>
+
+<form method="POST" id="walkinForm">
+<div style="display:grid;grid-template-columns:360px 1fr;gap:1.5rem;align-items:start;">
+
+  <!-- LEFT -->
+  <div>
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">👤 Customer Details</h3></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Customer Name <span style="color:red">*</span></label>
+          <input type="text" name="customer_name" id="customerName" class="form-control"
+                 placeholder="Enter customer name..." required
+                 style="font-size:1rem;font-weight:600;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input type="date" name="dispense_date" class="form-control" value="{{ today }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Payment Status</label>
+          <select name="payment_status" class="form-control">
+            <option value="paid">Paid</option>
+            <option value="pending">Pending</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bill Summary -->
+    <div class="card" style="margin-top:1rem;">
+      <div class="card-header"><h3 class="card-title">🧾 Bill Summary</h3></div>
+      <div class="card-body" style="padding:0;">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+          <thead>
+            <tr style="background:#f8fafc;">
+              <th style="padding:.5rem .75rem;text-align:left;">Medicine</th>
+              <th style="padding:.5rem .75rem;text-align:center;">Qty</th>
+              <th style="padding:.5rem .75rem;text-align:right;">Rate</th>
+              <th style="padding:.5rem .75rem;text-align:right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody id="billBody">
+            <tr><td colspan="4" style="padding:1rem;text-align:center;color:var(--muted);">Add medicines →</td></tr>
+          </tbody>
+        </table>
+        <div style="text-align:right;padding:.875rem;border-top:2px solid var(--border);">
+          <div style="font-size:.78rem;color:var(--muted);">Total Amount</div>
+          <div id="grandTotal">₹0.00</div>
+        </div>
+      </div>
+      <div style="padding:.875rem;border-top:1px solid var(--border);display:flex;gap:.6rem;">
+        <button type="submit" name="action" value="save" class="btn btn-secondary" style="flex:1;font-size:.95rem;">
+          💾 Save Only
+        </button>
+        <button type="submit" name="action" value="save_print" class="btn btn-success" style="flex:1;font-size:.95rem;">
+          🖨️ Save &amp; Print
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Medicine table -->
+  <div class="card">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <h3 class="card-title">💊 Medicines</h3>
+      <button type="button" class="btn btn-primary btn-sm" onclick="addMedRow()">+ Add Medicine</button>
+    </div>
+    <div class="card-body">
+      <!-- Column headers -->
+      <div style="display:grid;grid-template-columns:2.5fr 80px 100px 110px 40px;gap:.5rem;
+                  padding:.3rem .75rem;font-size:.72rem;font-weight:700;color:var(--muted);
+                  border-bottom:1px solid var(--border);margin-bottom:.5rem;">
+        <span>Medicine</span><span>Qty</span><span>Rate (₹)</span><span>Amount (₹)</span><span></span>
+      </div>
+
+      <div id="medContainer"></div>
+
+      <div id="emptyMsg" style="text-align:center;padding:2.5rem;color:var(--muted);font-size:.9rem;">
+        Click <strong>"+ Add Medicine"</strong> to start
+      </div>
+    </div>
+  </div>
+
+</div>
+</form>
+
+<script>
+const medicines = {{ medicines|tojson }};
+const medMap = {};
+medicines.forEach(m => { medMap[m.id] = m; });
+let rowId = 0;
+
+// Build medicine options once
+const medOpts = medicines.map(m =>
+  `<option value="${m.id}" data-price="${m.sale_price||0}" data-stock="${m.total_qty||0}">${m.medicine_name} (Stock: ${m.total_qty||0})</option>`
+).join('');
+
+function addMedRow() {
+  document.getElementById('emptyMsg').style.display = 'none';
+  rowId++;
+  const rid = rowId;
+  const wrap = document.createElement('div');
+  wrap.className = 'wrow-wrap';
+  wrap.id = 'wrow_' + rid;
+  wrap.innerHTML = `
+    <div class="wrow-main">
+      <div>
+        <select name="medicine_id" class="form-control" onchange="onMedChange(this,${rid})" required style="font-size:.88rem;">
+          <option value="">— Select Medicine —</option>${medOpts}
+        </select>
+        <input type="hidden" name="batch_id" id="wbid_${rid}" value="">
+        <div id="wstock_${rid}" style="font-size:.7rem;color:var(--muted);margin-top:.2rem;height:14px;"></div>
+      </div>
+      <div>
+        <input type="number" name="quantity" id="wqty_${rid}" class="form-control"
+               value="1" min="1" oninput="calcWRow(${rid})" style="text-align:center;">
+      </div>
+      <div>
+        <input type="text" id="wrate_${rid}" class="form-control" readonly
+               style="background:#f8fafc;text-align:right;" value="0.00">
+      </div>
+      <div>
+        <input type="text" id="wamt_${rid}" class="form-control" readonly
+               style="background:#f0fdf4;font-weight:700;color:var(--success);text-align:right;" value="0.00">
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center;">
+        <button type="button" class="remove-btn" onclick="removeWRow(${rid})" title="Remove">✕</button>
+      </div>
+    </div>
+    <div class="wrow-note">
+      <input type="text" name="item_note" class="form-control"
+             placeholder="📝 Instructions e.g. 1 tablet twice daily after food, or apply on affected area..."
+             style="font-size:.82rem;color:#374151;border-color:#e5e7eb;">
+    </div>`;
+  document.getElementById('medContainer').appendChild(wrap);
+  wrap.querySelector('select').focus();
+  calcGrand();
+}
+
+function onMedChange(sel, rid) {
+  const mid = parseInt(sel.value);
+  if (!mid) { document.getElementById('wstock_'+rid).textContent=''; return; }
+  const m = medMap[mid];
+  if (!m) return;
+  const rate  = parseFloat(m.sale_price) || 0;
+  const stock = parseInt(m.total_qty) || 0;
+  document.getElementById('wrate_'+rid).value = rate.toFixed(2);
+  document.getElementById('wstock_'+rid).textContent = stock > 0 ? `Available: ${stock} units` : '⚠ Out of stock';
+  document.getElementById('wstock_'+rid).style.color = stock > 0 ? 'var(--muted)' : 'var(--danger)';
+  document.getElementById('wqty_'+rid).max = stock;
+  calcWRow(rid);
+  // Auto-select first batch
+  fetch('/pharmacy/' + mid + '/batches')
+    .then(r => r.json())
+    .then(data => {
+      const list = Array.isArray(data) ? data : (data.batches || []);
+      if (list.length > 0) document.getElementById('wbid_'+rid).value = list[0].id;
+    }).catch(() => {});
+}
+
+function calcWRow(rid) {
+  const qty  = parseFloat(document.getElementById('wqty_'+rid).value) || 0;
+  const rate = parseFloat(document.getElementById('wrate_'+rid).value) || 0;
+  document.getElementById('wamt_'+rid).value = (qty * rate).toFixed(2);
+  calcGrand();
+}
+
+function removeWRow(rid) {
+  const el = document.getElementById('wrow_'+rid);
+  if (el) el.remove();
+  if (!document.querySelectorAll('.wrow-wrap').length)
+    document.getElementById('emptyMsg').style.display = 'block';
+  calcGrand();
+}
+
+function calcGrand() {
+  let total = 0;
+  const rows = [];
+  document.querySelectorAll('.wrow-wrap').forEach(wrap => {
+    const sel  = wrap.querySelector('select[name=medicine_id]');
+    const qty  = parseFloat(wrap.querySelector('input[name=quantity]')?.value) || 0;
+    const rate = parseFloat(wrap.querySelector('[id^=wrate_]')?.value) || 0;
+    const amt  = qty * rate;
+    if (sel && sel.value) {
+      total += amt;
+      rows.push({ name: sel.selectedOptions[0]?.text || '', qty, rate, amt });
+    }
+  });
+  document.getElementById('grandTotal').textContent = '₹' + total.toFixed(2);
+  // Update bill summary
+  const tbody = document.getElementById('billBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="padding:1rem;text-align:center;color:var(--muted);">Add medicines →</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r =>
+    `<tr style="border-bottom:1px solid #f3f4f6;">
+       <td style="padding:.4rem .75rem;">${r.name.split('(')[0].trim()}</td>
+       <td style="padding:.4rem .75rem;text-align:center;">${r.qty}</td>
+       <td style="padding:.4rem .75rem;text-align:right;">₹${r.rate.toFixed(2)}</td>
+       <td style="padding:.4rem .75rem;text-align:right;font-weight:700;">₹${r.amt.toFixed(2)}</td>
+     </tr>`
+  ).join('');
+}
+
+// Start with one row
+addMedRow();
+</script>
+{% endblock %}

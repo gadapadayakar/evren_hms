@@ -1,0 +1,14 @@
+{% extends 'base.html' %}{% block title %}Add Bed{% endblock %}{% block page_title %}Add Bed{% endblock %}{% block content %}
+<div class="page-header"><div><h1>Add Bed</h1></div><a href="{{ url_for('beds') }}" class="btn btn-secondary">← Back</a></div>
+<div class="card"><div class="card-body"><form method="POST">
+  <div class="form-grid">
+    <div class="form-group"><label class="form-label">Bed No/Name *</label><input type="text" name="name" class="form-control" required></div>
+    <div class="form-group"><label class="form-label">Type</label>
+      <select name="bed_type_id" class="form-control"><option value="">Select…</option>{% for t in types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
+    <div class="form-group"><label class="form-label">Ward / Group</label>
+      <select name="bed_group_id" class="form-control"><option value="">Select…</option>{% for g in groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select></div>
+    <div class="form-group"><label class="form-label">Charge / Day</label><input type="number" name="charge_per_day" class="form-control" step="0.01" value="0"></div>
+  </div>
+  <div class="form-group mt-3"><label class="form-label">Description</label><textarea name="description" class="form-control"></textarea></div>
+  <div class="mt-4 flex gap-2"><button type="submit" class="btn btn-primary">Add Bed</button><a href="{{ url_for('beds') }}" class="btn btn-secondary">Cancel</a></div>
+</form></div></div>{% endblock %}

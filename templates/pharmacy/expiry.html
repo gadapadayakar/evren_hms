@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% block title %}Expiring Medicines{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">⚠️ Expiring Medicines</h1>
+  <a href="{{ url_for('pharmacy_list') }}" class="btn btn-secondary">← Back to Pharmacy</a>
+</div>
+
+<!-- Stats Cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1.5rem;">
+  <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:1rem;text-align:center;">
+    <div style="font-size:2rem;font-weight:800;color:#dc2626;">{{ expired_count }}</div>
+    <div style="font-size:.8rem;color:#dc2626;font-weight:600;">ALREADY EXPIRED</div>
+  </div>
+  <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:1rem;text-align:center;">
+    <div style="font-size:2rem;font-weight:800;color:#d97706;">{{ critical_count }}</div>
+    <div style="font-size:.8rem;color:#d97706;font-weight:600;">EXPIRING IN 30 DAYS</div>
+  </div>
+  <div style="background:#e0f2fe;border:1px solid #7dd3fc;border-radius:10px;padding:1rem;text-align:center;">
+    <div style="font-size:2rem;font-weight:800;color:#0284c7;">{{ warning_count }}</div>
+    <div style="font-size:.8rem;color:#0284c7;font-weight:600;">EXPIRING IN 60 DAYS</div>
+  </div>
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:1rem;text-align:center;">
+    <div style="font-size:2rem;font-weight:800;color:#16a34a;">{{ medicines|length }}</div>
+    <div style="font-size:.8rem;color:#16a34a;font-weight:600;">TOTAL EXPIRING</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom:1.5rem;">
+  <div class="card-body" style="padding:1rem;">
+    <form method="get" style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;">
+      <div class="form-group" style="margin:0;flex:1;min-width:200px;">
+        <label class="form-label">🔍 Search Medicine</label>
+        <input type="text" name="search" class="form-control" value="{{ search }}" placeholder="Search by name or category..." style="height:40px;">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">Show expiring within</label>
+        <select name="days" class="form-control" style="height:40px;min-width:150px;">
+          <option value="30" {% if days==30 %}selected{% endif %}>30 Days</option>
+          <option value="60" {% if days==60 %}selected{% endif %}>60 Days</option>
+          <option value="90" {% if days==90 %}selected{% endif %}>90 Days</option>
+          <option value="180" {% if days==180 %}selected{% endif %}>180 Days</option>
+          <option value="365" {% if days==365 %}selected{% endif %}>1 Year</option>
+        </select>
+      </div>
+      <div>
+        <button type="submit" class="btn btn-primary" style="height:40px;">Filter</button>
+        <a href="{{ url_for('pharmacy_expiry') }}" class="btn btn-secondary" style="height:40px;line-height:1.6;">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Print Button -->
+<div style="margin-bottom:1rem;text-align:right;">
+  <button onclick="window.print()" class="btn btn-secondary">🖨️ Print Report</button>
+</div>
+
+<div class="card">
+  <div class="card-body" style="padding:0;">
+    {% if medicines %}
+    <table class="table" style="margin:0;">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Medicine Name</th>
+          <th>Category</th>
+          <th>Batch No</th>
+          <th>Expiry Date</th>
+          <th>Days Left</th>
+          <th>Qty in Stock</th>
+          <th>Sale Price</th>
+          <th>Stock Value</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in medicines %}
+        {% set exp = m.expiry_date %}
+        {% set days_left = ((exp | string)[:10] | replace('-','') | int) - (today | replace('-','') | int) %}
+        <tr style="{% if m.status == 'expired' %}background:#fff5f5;{% elif m.status == 'critical' %}background:#fffbeb;{% elif m.status == 'warning' %}background:#eff6ff;{% endif %}">
+          <td>{{ loop.index }}</td>
+          <td><strong>{{ m.medicine_name }}</strong>{% if m.medicine_company %}<br><small style="color:var(--muted);">{{ m.medicine_company }}</small>{% endif %}</td>
+          <td>{{ m.medicine_category or '—' }}</td>
+          <td>{{ m.batch_no or '—' }}</td>
+          <td style="font-weight:600;">{{ m.expiry_date or '—' }}</td>
+          <td>
+            {% if m.status == 'expired' %}
+              <span style="color:#dc2626;font-weight:700;">EXPIRED</span>
+            {% else %}
+              {% set diff = (m.expiry_date[:10] | string) %}
+              <span style="font-weight:600;color:{% if m.status=='critical' %}#d97706{% elif m.status=='warning' %}#0284c7{% else %}#16a34a{% endif %};">
+                {{ m.expiry_date }}
+              </span>
+            {% endif %}
+          </td>
+          <td style="font-weight:600;">{{ m.available_quantity }}</td>
+          <td>₹{{ '%.2f'|format(m.sale_price or 0) }}</td>
+          <td>₹{{ '%.2f'|format((m.sale_price or 0) * (m.available_quantity or 0)) }}</td>
+          <td>
+            {% if m.status == 'expired' %}
+              <span class="badge" style="background:#dc2626;color:#fff;padding:.25rem .6rem;border-radius:20px;font-size:.75rem;">Expired</span>
+            {% elif m.status == 'critical' %}
+              <span class="badge" style="background:#d97706;color:#fff;padding:.25rem .6rem;border-radius:20px;font-size:.75rem;">Critical</span>
+            {% elif m.status == 'warning' %}
+              <span class="badge" style="background:#0284c7;color:#fff;padding:.25rem .6rem;border-radius:20px;font-size:.75rem;">Warning</span>
+            {% else %}
+              <span class="badge" style="background:#16a34a;color:#fff;padding:.25rem .6rem;border-radius:20px;font-size:.75rem;">OK</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center;padding:3rem;color:var(--muted);">
+      <div style="font-size:3rem;">✅</div>
+      <p style="margin-top:.5rem;">No medicines expiring within {{ days }} days{% if search %} matching "{{ search }}"{% endif %}.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+@media print {
+  .btn, form, a { display: none !important; }
+  .card { box-shadow: none; border: 1px solid #ccc; }
+  body { font-size: 12px; }
+}
+</style>
+{% endblock %}

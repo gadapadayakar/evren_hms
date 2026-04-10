@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% block title %}Medicine Dispense Log{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1>📋 Medicine Dispense Log</h1>
+    <div class="breadcrumb">Pharmacy → Dispense Log</div>
+  </div>
+  <div class="flex gap-2">
+    <a href="{{ url_for('pharmacy_walkin') }}" class="btn" style="background:#7c3aed;color:#fff;">🛍️ Walk-in Sale</a>
+    <a href="{{ url_for('pharmacy_dispense') }}" class="btn btn-success">💉 + Dispense</a>
+  </div>
+</div>
+
+<!-- Filter & Stats Bar -->
+<div class="card" style="margin-bottom:1.25rem;">
+  <div class="card-body" style="padding:.875rem 1rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+      <form method="GET" style="display:flex;gap:.75rem;align-items:center;">
+        <label class="form-label" style="margin:0;font-weight:600;">📅 Date:</label>
+        <input type="date" name="date" class="form-control" value="{{ date_filter }}" style="width:175px;">
+        <button type="submit" class="btn btn-primary">Filter</button>
+      </form>
+      <div style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div style="font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Bills Today</div>
+          <div style="font-size:1.5rem;font-weight:800;color:#7c3aed;">{{ bills|length }}</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Items Dispensed</div>
+          <div style="font-size:1.5rem;font-weight:800;color:#0284c7;">{{ records|length }}</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Total Revenue</div>
+          <div style="font-size:1.5rem;font-weight:800;color:var(--success);">₹{{ "%.2f"|format(total) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if bills %}
+
+<!-- Bills grouped by patient -->
+{% for bill in bills %}
+<div class="card" style="margin-bottom:1.25rem;border-left:4px solid {% if bill.is_walkin %}#7c3aed{% else %}#10b981{% endif %};">
+
+  <!-- Bill Header -->
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:.875rem 1.25rem;
+              background:{% if bill.is_walkin %}#faf5ff{% else %}#f0fdf4{% endif %};
+              border-bottom:1px solid var(--border);">
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <div style="width:42px;height:42px;border-radius:50%;
+                  background:{% if bill.is_walkin %}#7c3aed{% else %}#10b981{% endif %};
+                  color:#fff;display:flex;align-items:center;justify-content:center;
+                  font-size:1.2rem;font-weight:700;flex-shrink:0;">
+        {% if bill.is_walkin %}🛍{% else %}👤{% endif %}
+      </div>
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;color:#111;">{{ bill.patient_name }}</div>
+        <div style="font-size:.78rem;color:var(--muted);">
+          {% if bill.is_walkin %}
+            <span style="background:#ede9fe;color:#7c3aed;padding:.1rem .5rem;border-radius:20px;font-size:.72rem;font-weight:600;">Walk-in Customer</span>
+          {% else %}
+            <span>ID: {{ bill.patient_unique_id }}</span>
+          {% endif %}
+          &nbsp;|&nbsp; Dispensed by: <strong>{{ bill.dispensed_by_name or '—' }}</strong>
+          &nbsp;|&nbsp; {{ bill.dispense_date }}
+        </div>
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Bill Total</div>
+      <div style="font-size:1.5rem;font-weight:800;color:var(--success);">₹{{ "%.2f"|format(bill.bill_total) }}</div>
+      {% if bill.payment_status == 'paid' %}
+        <span style="background:#dcfce7;color:#16a34a;padding:.15rem .6rem;border-radius:20px;font-size:.72rem;font-weight:700;">✓ Paid</span>
+      {% else %}
+        <span style="background:#fef3c7;color:#d97706;padding:.15rem .6rem;border-radius:20px;font-size:.72rem;font-weight:700;">⏳ Pending</span>
+      {% endif %}
+      <div style="margin-top:.5rem;">
+        {% if bill.is_walkin %}
+        <a href="{{ url_for('pharmacy_bill_print', customer=bill.patient_name, date=bill.dispense_date) }}"
+           target="_blank"
+           style="font-size:.75rem;background:#7c3aed;color:#fff;padding:.25rem .75rem;border-radius:6px;text-decoration:none;display:inline-block;">
+          🖨️ Print Bill
+        </a>
+        {% else %}
+        <a href="{{ url_for('pharmacy_bill_print', patient_id=bill.patient_id, date=bill.dispense_date) }}"
+           target="_blank"
+           style="font-size:.75rem;background:#10b981;color:#fff;padding:.25rem .75rem;border-radius:6px;text-decoration:none;display:inline-block;">
+          🖨️ Print Bill
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Bill Items Table -->
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="background:#f8fafc;font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;">
+          <th style="padding:.5rem 1.25rem;text-align:left;">#</th>
+          <th style="padding:.5rem .75rem;text-align:left;">Medicine</th>
+          <th style="padding:.5rem .75rem;text-align:left;">Category</th>
+          <th style="padding:.5rem .75rem;text-align:center;">Qty</th>
+          <th style="padding:.5rem .75rem;text-align:right;">Rate (₹)</th>
+          <th style="padding:.5rem .75rem;text-align:right;">Amount (₹)</th>
+          <th style="padding:.5rem .75rem;text-align:left;">Instructions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in bill.medicines %}
+        <tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:.55rem 1.25rem;font-size:.85rem;color:var(--muted);">{{ loop.index }}</td>
+          <td style="padding:.55rem .75rem;">
+            <strong style="font-size:.9rem;">{{ item.medicine_name }}</strong>
+          </td>
+          <td style="padding:.55rem .75rem;font-size:.82rem;color:var(--muted);">{{ item.unit or '—' }}</td>
+          <td style="padding:.55rem .75rem;text-align:center;font-weight:600;">{{ item.quantity }}</td>
+          <td style="padding:.55rem .75rem;text-align:right;font-size:.88rem;">₹{{ "%.2f"|format(item.sale_price or 0) }}</td>
+          <td style="padding:.55rem .75rem;text-align:right;font-weight:700;color:var(--success);">₹{{ "%.2f"|format(item.total_amount or 0) }}</td>
+          <td style="padding:.55rem .75rem;font-size:.78rem;color:#7c3aed;font-style:italic;">
+            {% set note = item.note or '' %}
+            {% if note and not note.startswith('Walk-in:') %}
+              📝 {{ note }}
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        <!-- Total row -->
+        <tr style="background:#f0fdf4;">
+          <td colspan="5" style="padding:.6rem 1.25rem;text-align:right;font-weight:700;font-size:.88rem;color:var(--muted);">Bill Total:</td>
+          <td style="padding:.6rem .75rem;text-align:right;font-weight:800;font-size:1.05rem;color:var(--success);">₹{{ "%.2f"|format(bill.bill_total) }}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endfor %}
+
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:4rem;">
+    <div style="font-size:3rem;">💊</div>
+    <h3 style="margin-top:.75rem;color:var(--muted);">No dispensing records for {{ date_filter }}</h3>
+    <p style="color:var(--muted);margin-top:.5rem;">Try selecting a different date or dispense medicines.</p>
+    <div style="margin-top:1.5rem;display:flex;gap:.75rem;justify-content:center;">
+      <a href="{{ url_for('pharmacy_dispense') }}" class="btn btn-success">💉 Dispense to Patient</a>
+      <a href="{{ url_for('pharmacy_walkin') }}" class="btn" style="background:#7c3aed;color:#fff;">🛍️ Walk-in Sale</a>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

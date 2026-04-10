@@ -1,0 +1,17 @@
+{% extends 'base.html' %}{% block title %}Add Lab Test{% endblock %}{% block page_title %}New Lab Test{% endblock %}{% block content %}
+<div class="page-header"><div><h1>New Lab Test</h1></div><a href="{{ url_for('lab') }}" class="btn btn-secondary">← Back</a></div>
+<div class="card"><div class="card-body"><form method="POST">
+  <div class="form-grid">
+    <div class="form-group"><label class="form-label">Patient *</label>
+      <select name="patient_id" class="form-control" required><option value="">Select…</option>{% for p in patients %}<option value="{{ p.id }}">{{ p.patient_name }} ({{ p.patient_unique_id }})</option>{% endfor %}</select></div>
+    <div class="form-group"><label class="form-label">Test Name *</label><input type="text" name="test_name" class="form-control" required list="common-tests">
+    <datalist id="common-tests"><option>CBC (Complete Blood Count)</option><option>Blood Sugar (Fasting)</option><option>Blood Sugar (Random)</option><option>HbA1c</option><option>Lipid Profile</option><option>Liver Function Test</option><option>Kidney Function Test</option><option>Thyroid (TSH)</option><option>Urine Routine</option><option>ECG</option></datalist></div>
+    <div class="form-group"><label class="form-label">Doctor</label>
+      <select name="doctor_id" class="form-control"><option value="">Select…</option>{% for d in doctors %}<option value="{{ d.id }}">{{ d.name }} {{ d.surname }}</option>{% endfor %}</select></div>
+    <div class="form-group"><label class="form-label">Test Date</label><input type="date" name="test_date" class="form-control" value="{{ today }}"></div>
+    <div class="form-group"><label class="form-label">Normal Range</label><input type="text" name="normal_range" class="form-control"></div>
+    <div class="form-group"><label class="form-label">Unit</label><input type="text" name="unit" class="form-control" placeholder="e.g. mg/dL"></div>
+  </div>
+  <div class="form-group mt-3"><label class="form-label">Note</label><textarea name="note" class="form-control"></textarea></div>
+  <div class="mt-4 flex gap-2"><button type="submit" class="btn btn-primary">Add Lab Test</button><a href="{{ url_for('lab') }}" class="btn btn-secondary">Cancel</a></div>
+</form></div></div>{% endblock %}

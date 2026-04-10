@@ -1,0 +1,39 @@
+{% extends 'base.html' %}{% block title %}New Appraisal{% endblock %}{% block page_title %}New Performance Appraisal{% endblock %}{% block content %}
+<div class="page-header"><div><h1>New Appraisal</h1></div><a href="{{ url_for('hr_appraisal') }}" class="btn btn-secondary">← Back</a></div>
+<div class="card"><div class="card-body"><form method="POST">
+  <div class="form-grid">
+    <div class="form-group"><label class="form-label">Staff Member *</label>
+      <select name="staff_id" class="form-control" required><option value="">Select…</option>{% for s in staff %}<option value="{{ s.id }}">{{ s.name }} {{ s.surname }} ({{ s.employee_id }})</option>{% endfor %}</select></div>
+    <div class="form-group"><label class="form-label">Review Period *</label>
+      <select name="period" class="form-control" required>{% for p in periods %}<option>{{ p }}</option>{% endfor %}</select></div>
+    <div class="form-group"><label class="form-label">Status</label>
+      <select name="status" class="form-control"><option value="draft">Draft</option><option value="final">Final</option></select></div>
+  </div>
+  <div class="form-section">Performance Scores (0–100)</div>
+  <div class="form-grid">
+    {% for fname,label in [('punctuality','Punctuality & Attendance'),('teamwork','Teamwork & Collaboration'),('technical_skills','Technical Skills'),('communication','Communication'),('patient_care','Patient Care')] %}
+    <div class="form-group"><label class="form-label">{{ label }}</label>
+      <input type="number" name="{{ fname }}" class="form-control" min="0" max="100" value="80" oninput="calcOverall()"></div>
+    {% endfor %}
+    <div class="form-group"><label class="form-label">Overall Score (Auto)</label>
+      <input type="text" id="overall" class="form-control" readonly style="background:#f8fafc;font-weight:700;font-size:1.1rem;"></div>
+  </div>
+  <div class="form-section">Feedback</div>
+  <div class="form-grid">
+    <div class="form-group"><label class="form-label">Strengths</label><textarea name="strengths" class="form-control"></textarea></div>
+    <div class="form-group"><label class="form-label">Areas for Improvement</label><textarea name="improvements" class="form-control"></textarea></div>
+    <div class="form-group"><label class="form-label">Goals for Next Period</label><textarea name="goals" class="form-control"></textarea></div>
+    <div class="form-group"><label class="form-label">Reviewer Comments</label><textarea name="reviewer_comments" class="form-control"></textarea></div>
+  </div>
+  <div class="mt-4 flex gap-2"><button type="submit" class="btn btn-primary">Save Appraisal</button><a href="{{ url_for('hr_appraisal') }}" class="btn btn-secondary">Cancel</a></div>
+</form></div></div>{% endblock %}
+{% block extra_js %}<script>
+function calcOverall(){
+  const ids=['punctuality','teamwork','technical_skills','communication','patient_care'];
+  const vals=ids.map(id=>parseFloat(document.querySelector('[name='+id+']').value)||0);
+  const avg=(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1);
+  const grade=avg>=90?'A+':avg>=80?'A':avg>=70?'B':avg>=60?'C':'D';
+  document.getElementById('overall').value=avg+' / '+grade;
+}
+calcOverall();
+</script>{% endblock %}
